@@ -1,0 +1,35 @@
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v3.2.0
+  hooks:
+  - id: check-ast
+  - id: check-byte-order-marker
+  - id: check-case-conflict
+  - id: check-executables-have-shebangs
+  - id: check-json
+  - id: check-merge-conflict
+  - id: check-symlinks
+  - id: check-vcs-permalinks
+  - id: check-yaml
+  - id: debug-statements
+  - id: end-of-file-fixer
+  - id: forbid-new-submodules
+  - id: mixed-line-ending
+  - id: trailing-whitespace
+- repo: https://github.com/asottile/add-trailing-comma
+  rev: v2.0.1
+  hooks:
+  - id: add-trailing-comma
+- repo: https://github.com/asottile/pyupgrade
+  rev: v2.7.2
+  hooks:
+  - id: pyupgrade
+- repo: https://github.com/asottile/reorder_python_imports
+  rev: v2.3.5
+  hooks:
+  - id: reorder-python-imports
+- repo: https://gitlab.com/pycqa/flake8
+  rev: 3.8.3
+  hooks:
+  - id: flake8
+    args:
+    - --max-line-length=120
