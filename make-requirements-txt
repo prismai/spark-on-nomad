@@ -1,0 +1,10 @@
+#!/bin/bash
+
+cd "$(dirname "$0")/k8s-emul" || exit 1
+
+CUSTOM_COMPILE_COMMAND="./make-requirements-txt" \
+    pip-compile \
+    "requirements.in" \
+    -v \
+    --generate-hashes \
+    "$@"
