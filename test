@@ -1,10 +1,18 @@
 #!/bin/bash
 
+set -euxo pipefail
+
 export K8S_EMUL_IMAGE
 
-if [ -z "$K8S_EMUL_IMAGE" ]; then
+if [ -z "${K8S_EMUL_IMAGE:-}" ]; then
     K8S_EMUL_IMAGE="k8s-emul:$(git describe --always --tags)"
     docker build -t "$K8S_EMUL_IMAGE" .
 fi
 
-exec docker-compose up --force-recreate --build --abort-on-container-exit --exit-code-from main
+docker-compose up --force-recreate --build --abort-on-container-exit --exit-code-from main
+rc=$?
+
+docker ps -q --filter "label=com.hashicorp.nomad.alloc_id" |
+    xargs -r docker stop
+
+exit $rc
