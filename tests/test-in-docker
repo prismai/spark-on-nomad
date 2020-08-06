@@ -2,6 +2,8 @@
 
 set -euxo pipefail
 
+captest --text
+
 retry() {
     local count=$1
     local delay=$2
@@ -45,7 +47,7 @@ cat >test-job.json <<'_END_'
               "args": [
                 "-enable-health"
               ],
-              "network_mode": "container:spark-on-nomad_cluster_1"
+              "network_mode": "container:tests_cluster_1"
             },
             "Resources": {
               "CPU": 500,
@@ -79,7 +81,7 @@ cat >test-job.json <<'_END_'
           "Unlimited": false
         },
         "EphemeralDisk": {
-          "SizeMB": 300
+          "SizeMB": 120
         }
       }
     ],
@@ -95,4 +97,4 @@ cat >test-job.json <<'_END_'
 _END_
 
 curl --silent --show-error --fail -XPOST http://cluster:4646/v1/jobs --data @test-job.json
-retry_curl 10 2 http://cluster:8043/health
+retry_curl 30 2 http://cluster:8043/health

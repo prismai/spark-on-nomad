@@ -25,13 +25,18 @@ services:
     network_mode: "service:cluster"
     cap_add:
     - ALL
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
     volumes:
     - "/var/run/docker.sock:/var/run/docker.sock"
-    - "nomad-tmp:/tmp"
-    # - "/tmp:/host"
+    - "nomad-tmp:/var/lib/nomad"
   k8s-emul:
     image: "${K8S_EMUL_IMAGE}"
     network_mode: "service:cluster"
 
 volumes:
   nomad-tmp:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
