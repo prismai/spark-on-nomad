@@ -29,10 +29,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
+    - run: >
+        echo ::set-env name=K8S_EMUL_IMAGE::kyryloshpytsyaprismai/k8s-emul:sha-${GITHUB_SHA::7}
+    - name: Pull Docker images
+      run: >
+        cd tests &&
+        docker-compose pull
     - name: Pull Docker layer cache
       uses: satackey/action-docker-layer-caching@v0.0.5
     - name: Run tests
       run: >
         sudo
-        K8S_EMUL_IMAGE=kyryloshpytsyaprismai/k8s-emul:sha-${GITHUB_SHA::7}
+        --preserve-env=K8S_EMUL_IMAGE
         ./run-tests

@@ -43,7 +43,7 @@ cat >test-job.json <<'_END_'
             "Driver": "docker",
             "User": "",
             "Config": {
-              "image": "pierrezemb/gostatic@sha256:e28d48e17840c5104b5133c30851ac45903b1d2f268d108c4cd0884802c9c87e",
+              "image": "pierrezemb/gostatic:latest",
               "args": [
                 "-enable-health"
               ],
