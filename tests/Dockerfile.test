@@ -1,7 +1,12 @@
 FROM debian:stable-slim
 
 # hadolint ignore=DL3008,DL3009
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates libcap-ng-utils
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    libcap-ng-utils
+
+RUN curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh
 
 WORKDIR /tmp
 COPY test-in-docker .

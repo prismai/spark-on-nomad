@@ -4,6 +4,8 @@ set -euxo pipefail
 
 captest --text
 
+docker run --rm busybox true
+
 retry() {
     local count=$1
     local delay=$2
