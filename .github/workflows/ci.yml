@@ -15,6 +15,9 @@ jobs:
       uses: pre-commit/action@v2.0.0
     - name: Pull Docker layer cache
       uses: satackey/action-docker-layer-caching@v0.0.5
+      with:
+        key: docker-layer-caching-${{ github.workflow }}-build-{hash}
+        restore-keys: docker-layer-caching-${{ github.workflow }}-build-
     - name: Build and push Docker images
       uses: docker/build-push-action@v1
       with:
@@ -39,6 +42,9 @@ jobs:
         docker-compose pull
     - name: Pull Docker layer cache
       uses: satackey/action-docker-layer-caching@v0.0.5
+      with:
+        key: docker-layer-caching-${{ github.workflow }}-test-{hash}
+        restore-keys: docker-layer-caching-${{ github.workflow }}-test-
     - name: Run tests
       run: >
         sudo
