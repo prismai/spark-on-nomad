@@ -28,4 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-    - run: sudo ./run-tests
+    - run: >
+        sudo
+        K8S_EMUL_IMAGE=kyryloshpytsyaprismai/k8s-emul:sha-${GITHUB_SHA::7}
+        ./run-tests
