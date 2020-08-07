@@ -10,10 +10,12 @@ services:
       context: .
       dockerfile: Dockerfile.test
     networks: ["spark-on-nomad-test"]
+    privileged: true
+    volumes:
+    - "/var/run/docker.sock:/var/run/docker.sock"
   cluster:
     image: consul:1.8.1
     networks: ["spark-on-nomad-test"]
-    privileged: true
     expose:
     - "4646"
     - "8500"
@@ -23,11 +25,7 @@ services:
       context: .
       dockerfile: Dockerfile.nomad
     network_mode: "service:cluster"
-    cap_add:
-    - ALL
-    security_opt:
-      - seccomp:unconfined
-      - apparmor:unconfined
+    privileged: true
     volumes:
     - "/var/run/docker.sock:/var/run/docker.sock"
     - "nomad-tmp:/var/lib/nomad"
