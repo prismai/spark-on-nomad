@@ -11,7 +11,8 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - uses: actions/setup-python@v1
-    - uses: pre-commit/action@v2.0.0
+    - name: Run pre-commit checks
+      uses: pre-commit/action@v2.0.0
     - name: Build and push Docker images
       uses: docker/build-push-action@v1
       with:
@@ -28,7 +29,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-    - run: >
+    - name: Pull Docker layer cache
+      uses: satackey/action-docker-layer-caching@v0.0.5
+    - name: Run tests
+      run: >
         sudo
         K8S_EMUL_IMAGE=kyryloshpytsyaprismai/k8s-emul:sha-${GITHUB_SHA::7}
         ./run-tests
