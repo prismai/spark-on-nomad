@@ -100,3 +100,9 @@ _END_
 
 curl --silent --show-error --fail -XPOST http://cluster:4646/v1/jobs --data @test-job.json
 retry_curl 30 2 http://cluster:8043/health
+
+ln -s /opt/spark* /opt/spark
+(
+    cd /opt/spark
+    ./bin/docker-image-tool.sh -t latest -p ./kubernetes/dockerfiles/spark/bindings/python/Dockerfile build
+)
