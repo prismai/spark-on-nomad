@@ -14,5 +14,11 @@ WORKDIR /tmp
 RUN curl -LO https://downloads.apache.org/spark/spark-3.0.0/spark-3.0.0-bin-hadoop3.2.tgz
 RUN tar xf /tmp/spark-*.tgz -C /opt
 
+# a workaround for known problem with openjdk install
+RUN mkdir -p /usr/share/man/man1
+# hadolint ignore=DL3008,DL3009
+RUN apt-get install -y --no-install-recommends default-jre maven
+RUN mvn dependency:get -Dartifact=org.apache.hadoop:hadoop-aws:3.2.0:jar -Dtransitive=true
+
 COPY test-in-docker .
 CMD ["./test-in-docker"]

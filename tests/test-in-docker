@@ -102,7 +102,29 @@ curl --silent --show-error --fail -XPOST http://cluster:4646/v1/jobs --data @tes
 retry_curl 30 2 http://cluster:8043/health
 
 ln -s /opt/spark* /opt/spark
+find /root/.m2/repository -name '*.jar' -exec ln -s {} /opt/spark/jars \;
+
 (
     cd /opt/spark
     ./bin/docker-image-tool.sh -t latest -p ./kubernetes/dockerfiles/spark/bindings/python/Dockerfile build
 )
+
+/opt/spark/bin/spark-submit \
+    --master k8s://http://cluster:8080 \
+    --deploy-mode cluster \
+    --name spark-pi \
+    --class org.apache.spark.examples.SparkPi \
+    --conf spark.executor.instances=1 \
+    --conf spark.kubernetes.namespace=spark \
+    --conf spark.kubernetes.driver.pod.name=spark-pi-driver \
+    --conf spark.kubernetes.container.image=spark:latest \
+    --conf spark.kubernetes.authenticate.driver.serviceAccountName=spark-serviceaccount \
+    --conf spark.kubernetes.file.upload.path=s3a://spark \
+    --conf spark.hadoop.fs.s3a.access.key=s3key \
+    --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
+    --conf spark.hadoop.fs.s3a.fast.upload=true \
+    --conf spark.hadoop.fs.s3a.secret.key=s3secret \
+    --conf spark.hadoop.fs.s3a.endpoint=minio:9000 \
+    --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
+    --conf spark.hadoop.fs.s3a.path.style.access=true \
+    file:///opt/spark/examples/jars/spark-examples_2.12-3.0.0.jar

@@ -1,3 +1,5 @@
+import logging
+
 from aiohttp import web as aw
 
 
@@ -6,6 +8,7 @@ async def get_health(request):
 
 
 app = aw.Application()
+logging.basicConfig(level=logging.DEBUG)
 app.add_routes([
     aw.get('/health', get_health),
 ])

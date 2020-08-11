@@ -11,10 +11,11 @@ if [ -z "${K8S_EMUL_IMAGE:-}" ]; then
     docker build -t "$K8S_EMUL_IMAGE" ..
 fi
 
+cleanup() {
+    docker ps -q --filter "label=com.hashicorp.nomad.alloc_id" |
+        xargs -r docker stop
+}
+
+trap "cleanup" EXIT SIGINT
+
 docker-compose up --force-recreate --build --abort-on-container-exit --exit-code-from main
-rc=$?
-
-docker ps -q --filter "label=com.hashicorp.nomad.alloc_id" |
-    xargs -r docker stop
-
-exit $rc
