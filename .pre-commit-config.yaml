@@ -27,6 +27,8 @@
   rev: v2.3.5
   hooks:
   - id: reorder-python-imports
+    args:
+    - --application-directories=k8s-emul
 - repo: https://gitlab.com/pycqa/flake8
   rev: 3.8.3
   hooks:

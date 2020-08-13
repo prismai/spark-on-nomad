@@ -12,6 +12,8 @@ RUN find /usr/local
 # hadolint ignore=DL3006
 FROM ${base_image}
 
+# hadolint ignore=DL3018
+RUN apk add --no-cache libstdc++
 COPY --from=builder /usr/local /usr/local
 
 WORKDIR /app

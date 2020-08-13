@@ -18,4 +18,4 @@ cleanup() {
 
 trap "cleanup" EXIT SIGINT
 
-docker-compose up --force-recreate --build --abort-on-container-exit --exit-code-from main
+time docker-compose up --force-recreate --build --abort-on-container-exit --exit-code-from main
