@@ -13,6 +13,9 @@ services:
     privileged: true
     volumes:
     - "/var/run/docker.sock:/var/run/docker.sock"
+    environment:
+    - CONFIGMAPS_CONSUL_PREFIX=k8s-configmaps/
+    - K8S_EMUL_IMAGE=${K8S_EMUL_IMAGE}
   cluster:
     image: consul:1.8.1
     networks: ["spark-on-nomad-test"]
@@ -33,9 +36,12 @@ services:
     image: "${K8S_EMUL_IMAGE}"
     network_mode: "service:cluster"
     environment:
+    - CONFIGMAPS_CONSUL_PREFIX=k8s-configmaps/
+    - CONSUL_ADDR=http://cluster:8500
     - NOMAD_ADDR=http://cluster:4646
+    - K8S_EMUL_IMAGE=${K8S_EMUL_IMAGE}
   minio:
-    image: minio/minio:RELEASE.2020-08-08T04-50-06Z
+    image: minio/minio:RELEASE.2020-08-13T02-39-50Z
     environment:
     - MINIO_ACCESS_KEY=s3key
     - MINIO_SECRET_KEY=s3secret

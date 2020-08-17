@@ -1,4 +1,7 @@
 aiohttp
 aiojobs
+aiolimiter
+aiorun
+atomicwrites
 jsonnet
 ruamel.yaml

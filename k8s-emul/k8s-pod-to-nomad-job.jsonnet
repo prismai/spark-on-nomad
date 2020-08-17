@@ -31,7 +31,7 @@ local k8s_pod = std.parseJson(std.extVar("k8s_pod"));
             },
             "Resources": {
               "CPU": 500,
-              "MemoryMB": 256,
+              "MemoryMB": 2048,
               "Networks": [
                 {
                   "Device": "",

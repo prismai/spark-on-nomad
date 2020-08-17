@@ -7,7 +7,6 @@ FROM ${base_image} as builder
 RUN apk add --no-cache alpine-sdk
 COPY k8s-emul/requirements.txt /tmp/
 RUN pip install -r /tmp/requirements.txt && pip check
-RUN find /usr/local
 
 # hadolint ignore=DL3006
 FROM ${base_image}
@@ -18,6 +17,6 @@ COPY --from=builder /usr/local /usr/local
 
 WORKDIR /app
 COPY k8s-emul/* ./
-RUN rm requirements.txt
+RUN rm requirements.*
 
 CMD ["python", "server.py"]

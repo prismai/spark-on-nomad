@@ -27,7 +27,23 @@ retry_curl 10 2 http://cluster:8080/health
 retry_curl 10 2 http://cluster:8500/v1/status/leader
 retry_curl 10 2 http://cluster:4646/v1/status/leader
 
-cat >test-job.json <<'_END_'
+cat >test-cm-file <<'_END_'
+Test config map
+_END_
+
+curl \
+    -XPUT \
+    --silent \
+    --show-error \
+    --fail \
+    --data-binary @test-cm-file \
+    http://cluster:8500/v1/kv/k8s-configmaps/test-ns/test-cm/file
+
+curl --silent --show-error --fail -o test-cm-file.in0 http://cluster:8500/v1/kv/k8s-configmaps/test-ns/test-cm/file?raw
+
+cmp test-cm-file test-cm-file.in0
+
+cat >test-job.json <<_END_
 {
   "Job": {
     "ID": "test",
@@ -41,15 +57,50 @@ cat >test-job.json <<'_END_'
         "Count": 1,
         "Tasks": [
           {
-            "Name": "task1",
+            "Name": "http-server",
             "Driver": "docker",
             "User": "",
             "Config": {
               "image": "pierrezemb/gostatic:latest",
               "args": [
-                "-enable-health"
+                "-enable-health",
+                "--path", "/alloc/cm/TEST"
               ],
+              "network_mode": "container:tests_cluster_1",
+              "volumes": [
+                "../alloc:/srv/http:ro"
+              ]
+            },
+            "Resources": {
+              "CPU": 500,
+              "MemoryMB": 256,
+              "Networks": [
+                {
+                  "Device": "",
+                  "CIDR": "",
+                  "IP": "",
+                  "MBits": 10,
+                  "DynamicPorts": [
+                  ]
+                }
+              ]
+            },
+            "Leader": true
+          },
+          {
+            "Name": "k8s-configmap",
+            "Driver": "docker",
+            "User": "",
+            "Config": {
+              "image": "$K8S_EMUL_IMAGE",
+              "command": "python",
+              "args": ["k8s-configmap-emul.py"],
               "network_mode": "container:tests_cluster_1"
+            },
+            "Env": {
+              "CONSUL_ADDR": "http://cluster:8500",
+              "CONSUL_KV2DIR_DIR_TEST": "k8s-configmaps/test-ns/test-cm",
+              "CONSUL_KV2DIR_ROOT": "/alloc/cm"
             },
             "Resources": {
               "CPU": 500,
@@ -100,13 +151,16 @@ _END_
 
 curl --silent --show-error --fail -XPOST http://cluster:4646/v1/jobs --data @test-job.json
 retry_curl 30 2 http://cluster:8043/health
+retry_curl 30 2 http://cluster:8043/file
+curl --silent --show-error --fail -o test-cm-file.in http://cluster:8043/file
+cmp test-cm-file test-cm-file.in
 
 ln -s /opt/spark* /opt/spark
 find /root/.m2/repository -name '*.jar' -exec ln -s {} /opt/spark/jars \;
 
 (
     cd /opt/spark
-    ./bin/docker-image-tool.sh -t latest -p ./kubernetes/dockerfiles/spark/bindings/python/Dockerfile build
+    ./bin/docker-image-tool.sh -t local -p ./kubernetes/dockerfiles/spark/bindings/python/Dockerfile build
 )
 
 /opt/spark/bin/spark-submit \
@@ -123,7 +177,7 @@ find /root/.m2/repository -name '*.jar' -exec ln -s {} /opt/spark/jars \;
     --conf spark.hadoop.fs.s3a.path.style.access=true \
     --conf spark.hadoop.fs.s3a.secret.key=s3secret \
     --conf spark.kubernetes.authenticate.driver.serviceAccountName=spark-serviceaccount \
-    --conf spark.kubernetes.container.image=spark:latest \
+    --conf spark.kubernetes.container.image=spark:local \
     --conf spark.kubernetes.driver.master=http://cluster:8080 \
     --conf spark.kubernetes.driver.pod.name=spark-pi-driver \
     --conf spark.kubernetes.file.upload.path=s3a://spark \
