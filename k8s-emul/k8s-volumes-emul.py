@@ -50,11 +50,12 @@ async def dir_task(limiter, session, path, consul_path):
                     continue
 
                 j = await r.json()
-        except aiohttp.client_exceptions.ClientConnectorError:
-            logger.warning("dir_task: consul server connection refused")
-            continue
-        except aiohttp.client_exceptions.ServerDisconnectedError:
-            logger.warning("dir_task: consul server disconnected")
+        except (
+            aiohttp.client_exceptions.ClientConnectorError,
+            aiohttp.client_exceptions.ServerDisconnectedError,
+            asyncio.exceptions.TimeoutError,
+        ) as e:
+            logger.warning("dir_task: consul server: %s", e)
             continue
 
         items = {i["Key"][len(consul_path) + 1:]: base64.b64decode(i["Value"]) for i in j}
@@ -79,6 +80,14 @@ async def dir_task(limiter, session, path, consul_path):
 
 
 async def main():
+    for i in os.environ.get("EMPTY_DIRS", "").split(":"):
+        if not i:
+            continue
+
+        p = pathlib.Path(i)
+        p.mkdir(parents=True, exist_ok=True)
+        p.chmod(0o777)
+
     dirs = {
         k[len(PREFIX):]: v
         for k, v in os.environ.items()

@@ -63,12 +63,11 @@ cat >test-job.json <<_END_
             "Config": {
               "image": "pierrezemb/gostatic:latest",
               "args": [
-                "-enable-health",
-                "--path", "/alloc/cm/TEST"
+                "-enable-health"
               ],
               "network_mode": "container:tests_cluster_1",
               "volumes": [
-                "../alloc:/srv/http:ro"
+                "../alloc/cm/TEST:/srv/http:ro"
               ]
             },
             "Resources": {
@@ -94,7 +93,7 @@ cat >test-job.json <<_END_
             "Config": {
               "image": "$K8S_EMUL_IMAGE",
               "command": "python",
-              "args": ["k8s-configmap-emul.py"],
+              "args": ["k8s-volumes-emul.py"],
               "network_mode": "container:tests_cluster_1"
             },
             "Env": {
@@ -156,7 +155,7 @@ curl --silent --show-error --fail -o test-cm-file.in http://cluster:8043/file
 cmp test-cm-file test-cm-file.in
 
 ln -s /opt/spark* /opt/spark
-find /root/.m2/repository -name '*.jar' -exec ln -s {} /opt/spark/jars \;
+find /root/.m2/repository -name '*.jar' -exec ln {} /opt/spark/jars \;
 
 (
     cd /opt/spark

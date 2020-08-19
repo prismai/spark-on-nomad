@@ -1,10 +1,11 @@
 import asyncio
+import io
 import json
 import os
 
 import _jsonnet
 import aiohttp
-import ruamel.yaml as yaml
+import ruamel.yaml
 from aiohttp import web as aw
 from aiojobs import aiohttp as aj
 
@@ -14,10 +15,14 @@ from log import logger
 CONFIGMAPS_CONSUL_PREFIX = os.environ["CONFIGMAPS_CONSUL_PREFIX"]
 CONSUL_ADDR = os.environ["CONSUL_ADDR"]
 NOMAD_ADDR = os.environ["NOMAD_ADDR"]
+K8S_EMUL_IMAGE = os.environ["K8S_EMUL_IMAGE"]
 
 
 def yaml_dump(d):
-    return yaml.dump(d)
+    yaml = ruamel.yaml.YAML()
+    s = io.StringIO()
+    yaml.dump(d, stream=s)
+    return s.getvalue()
 
 
 def dbg_yaml(d):
@@ -71,8 +76,10 @@ async def post_pods(request):
     nomad_job_spec = _jsonnet.evaluate_file(
         "k8s-pod-to-nomad-job.jsonnet",
         ext_vars=dict(
+            configmaps_consul_prefix=CONFIGMAPS_CONSUL_PREFIX,
             k8s_namespace=namespace,
             k8s_pod=k8s_pod_spec,
+            k8s_emul_image=K8S_EMUL_IMAGE,
         ),
     )
     logger.debug(
@@ -92,7 +99,6 @@ async def post_pods(request):
             reply = _jsonnet.evaluate_file(
                 "k8s-pod-create-result.jsonnet",
                 ext_vars=dict(
-                    configmaps_consul_prefix=CONFIGMAPS_CONSUL_PREFIX,
                     k8s_namespace=namespace,
                     k8s_pod=k8s_pod_spec,
                     nomad_job_result=nomad_job_result,
@@ -112,6 +118,46 @@ async def post_pods(request):
                 text="Failed",
                 status=400,
             )
+
+
+async def get_pod(request):
+    namespace = request.match_info["namespace"]
+    name = request.match_info["name"]
+    logger.debug("get_pod namespace=%s name=%s", namespace, name)
+
+    client_session = get_client_session(request)
+
+    async with client_session.get(f"{NOMAD_ADDR}/v1/jobs?prefix={name}") as resp:
+        if resp.status != 200:
+            logger.debug("get_pod: nomad response code=%s: %s", resp.status, await resp.text())
+            return aw.Response(
+                text="Failed",
+                status=400,
+            )
+        else:
+            jobs = await resp.json()
+            jobs = [i for i in jobs if i["Name"] == name]
+            if jobs:
+                reply = _jsonnet.evaluate_file(
+                    "k8s-pod-get-result.jsonnet",
+                    ext_vars=dict(
+                        k8s_namespace=namespace,
+                        nomad_job=json.dumps(jobs[0]),
+                    ),
+                )
+                logger.debug("get_pod replying:\n%s", dbg_jsons2yaml(reply))
+
+                return aw.json_response(
+                    reply,
+                    status=200,
+                    dumps=lambda x: x,
+                )
+            else:
+                logger.debug("get_pod replying -- not found")
+                return aw.Response(
+                    text="Not found",
+                    status=404,
+                )
 
 
 async def post_services(request):
@@ -215,8 +261,8 @@ r = app.router.add_resource("/api/v1/namespaces/{namespace}/pods")
 r.add_route("GET", get_pods)
 r.add_route("POST", post_pods)
 
-# r = app.router.add_resource("/api/v1/namespaces/{namespace}/pods/{name}")
-# r.add_route("GET", get_pod)
+r = app.router.add_resource("/api/v1/namespaces/{namespace}/pods/{name}")
+r.add_route("GET", get_pod)
 # r.add_route("DELETE", delete_pod)
 #
 # r = app.router.add_resource("/api/v1/namespaces/{namespace}/services/{name}")
