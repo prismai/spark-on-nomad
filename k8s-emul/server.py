@@ -14,6 +14,7 @@ from log import logger
 
 CONFIGMAPS_CONSUL_PREFIX = os.environ["CONFIGMAPS_CONSUL_PREFIX"]
 CONSUL_ADDR = os.environ["CONSUL_ADDR"]
+HOST_CONTAINER = os.environ.get("HOST_CONTAINER", "")
 NOMAD_ADDR = os.environ["NOMAD_ADDR"]
 K8S_EMUL_IMAGE = os.environ["K8S_EMUL_IMAGE"]
 
@@ -44,7 +45,7 @@ def get_client_session(request):
 
 
 async def get_health(request):
-    logger.debug("get_health %s", lambda: 42)
+    logger.debug("get_health")
     return aw.Response(text="ok")
 
 
@@ -63,6 +64,15 @@ async def get_pods(request):
                 break
 
         return ws
+    else:
+        return aw.json_response(
+            {
+                "kind": "PodList",
+                "apiVersion": "v1",
+                "metadata": {"resourceVersion": "123"},
+                "items": [],
+            },
+        )
 
 
 async def post_pods(request):
@@ -77,6 +87,8 @@ async def post_pods(request):
         "k8s-pod-to-nomad-job.jsonnet",
         ext_vars=dict(
             configmaps_consul_prefix=CONFIGMAPS_CONSUL_PREFIX,
+            consul_addr=CONSUL_ADDR,
+            host_container=HOST_CONTAINER,
             k8s_namespace=namespace,
             k8s_pod=k8s_pod_spec,
             k8s_emul_image=K8S_EMUL_IMAGE,

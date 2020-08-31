@@ -4,6 +4,8 @@ FROM debian:stable-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
+    iproute2 \
+    jq \
     libcap-ng-utils \
     python3-pip \
     python3-setuptools

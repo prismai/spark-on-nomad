@@ -16,8 +16,17 @@ local ed_volumes = mko([
 ]);
 
 local env_overloads = {
-  SPARK_DRIVER_URL: "spark://CoarseGrainedScheduler@127.0.0.1:7078"
 };
+
+local task_config_extra = {}
++ (
+  if std.extVar("host_container") != "" then
+  {
+    "network_mode": "container:" + std.extVar("host_container"),
+  }
+  else
+  {}
+);
 
 {
   "Job": {
@@ -30,23 +39,47 @@ local env_overloads = {
       {
         "Name": "group1",
         "Count": 1,
-        "Tasks": std.map(
-          function(k8s_container)
+        "Networks": [
+          {
+            "Mode": "host",
+            "DynamicPorts": [
+              {
+                "Label": "%s--%s" % [k8s_container.name, k8s_port.name],
+                "To": -1,
+              }
+              for k8s_container in k8s_pod.spec.containers
+              for k8s_port in k8s_container.ports
+            ],
+          },
+        ],
+        "Services": [
+            {
+              "Name": "k8s--%s--%s--%s" % [k8s_namespace, k8s_pod.metadata.labels["spark-role"], k8s_port.name],
+              #[k8s_namespace, k8s_pod.metadata.name, k8s_port.name],
+              "PortLabel": "%s--%s" % [k8s_container.name, k8s_port.name],
+            }
+            for k8s_container in k8s_pod.spec.containers
+            for k8s_port in k8s_container.ports
+        ],
+        "Tasks": [
           {
             "Name": k8s_container.name,
             "Driver": "docker",
             "User": "",
             "Config": {
               "image": k8s_container.image,
-              "args": k8s_container.args,
-              "network_mode": "container:tests_cluster_1",
-              "port_map": std.map(
-                function(k8s_port)
-                {
-                  [k8s_port.name]: k8s_port.containerPort,
-                },
-                k8s_container.ports
-              ),
+              "args": std.flattenArrays([
+                if i == "--properties-file" then
+                  [
+                    "--conf", "spark.driver.host=${attr.unique.network.ip-address}",
+                    "--conf", "spark.driver.port=${NOMAD_PORT_spark_kubernetes_driver__driver_rpc_port}",
+                    "--conf", "spark.driver.blockManager.port=${NOMAD_PORT_spark_kubernetes_driver__blockmanager}",
+                    i
+                  ]
+                else
+                  [i]
+                for i in k8s_container.args
+              ]),
               "volumes":
               [
                 "../alloc/cm/%s:%s:ro" % [vol.name, vol.mountPath]
@@ -62,13 +95,14 @@ local env_overloads = {
                 "/dev/null:/var/run/secrets/kubernetes.io/serviceaccount/token:ro",
                 "/dev/null:/var/run/secrets/kubernetes.io/serviceaccount/ca.crt:ro",
               ],
-            },
+            } + task_config_extra,
             "Env": {
             }
             + mko([
               {[i.name]: gd(env_overloads, i.name, i.value)}
               for i in k8s_container.env
               if std.objectHas(i, "value")
+              && i.name != "SPARK_DRIVER_URL"
             ])
             + mko([
               {
@@ -81,23 +115,30 @@ local env_overloads = {
               if std.objectHas(i, "valueFrom")
             ]),
             "Resources": {
-              "CPU": 500,
+              "CPU": 1000,
               "MemoryMB": 2048,
-              "Networks": [
-                {
-                  "Device": "",
-                  "CIDR": "",
-                  "IP": "",
-                  "MBits": 10,
-                  "DynamicPorts": [
-                  ]
-                }
-              ]
             },
+            "Templates": [] +
+            (
+              if k8s_pod.metadata.labels["spark-role"] == "executor" then
+              [{
+                "DestPath": "secrets/file.env",
+                "ChangeMode": "noop",
+                "EmbeddedTmpl": |||
+                  {{ with service "k8s--%s--driver--driver-rpc-port|any" }}{{ with index . 0 }}
+                  SPARK_DRIVER_URL=spark://CoarseGrainedScheduler@{{ .Address }}:{{ .Port }}
+                  {{ end }}{{ end }}
+                  SPARK_JAVA_OPT_1000=-Dspark.blockManager.port={{ env "NOMAD_PORT_spark_kubernetes_executor__blockmanager" }}
+                ||| % [k8s_namespace],
+                "Envvars": true,
+              }]
+              else
+              []
+            ),
             "Leader": true
-          },
-          k8s_pod.spec.containers
-        ) +
+          }
+          for k8s_container in k8s_pod.spec.containers
+        ] +
         [
           {
             "Name": "k8s-volumes",
@@ -107,10 +148,9 @@ local env_overloads = {
               "image": std.extVar("k8s_emul_image"),
               "command": "python",
               "args": ["k8s-volumes-emul.py"],
-              "network_mode": "container:tests_cluster_1"
-            },
+            } + task_config_extra,
             "Env": {
-              "CONSUL_ADDR": "http://cluster:8500",
+              "CONSUL_ADDR": std.extVar("consul_addr"),
               "CONSUL_KV2DIR_ROOT": "/alloc/cm",
               "EMPTY_DIRS": std.join(":", ["/alloc/ed/%s" % i for i in std.objectFields(ed_volumes)]),
             } + mko([
@@ -135,10 +175,13 @@ local env_overloads = {
           }
         ],
         "RestartPolicy": {
-          "Attempts": 0,
+          "Attempts": 1,
+          "Delay": 5e9,
+          "Mode": "fail",
         },
         "ReschedulePolicy": {
           "Attempts": 0,
+          "Unlimited": false,
         },
         "EphemeralDisk": {
           "SizeMB": 120

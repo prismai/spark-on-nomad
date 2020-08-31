@@ -80,6 +80,9 @@ async def dir_task(limiter, session, path, consul_path):
 
 
 async def main():
+    for k, v in sorted(os.environ.items()):
+        logger.debug("ENV: %s=%s", k, v)
+
     for i in os.environ.get("EMPTY_DIRS", "").split(":"):
         if not i:
             continue

@@ -10,6 +10,7 @@ cat >/etc/nomad/local.hcl <<'_END_'
 bind_addr = "0.0.0.0"
 data_dir  = "/var/lib/nomad"
 client {
+    network_interface = "eth0"
     options = {
         "docker.volumes.enabled" = true
     }

@@ -20,7 +20,16 @@ retry() {
 }
 
 retry_curl() {
-    retry "$1" "$2" curl --silent --show-error --fail "$3"
+    retry "$1" "$2" curl --silent --show-error --fail -o >(tee curl-out) "$3"
+}
+
+try_consul_service() {
+    curl --silent --show-error --fail -o >(tee curl-out) http://cluster:8500/v1/catalog/service/"$1"
+    [ "$(<curl-out)" != "[]" ]
+}
+
+retry_consul_service() {
+    retry "$1" "$2" try_consul_service "$3"
 }
 
 retry_curl 10 2 http://cluster:8080/health
@@ -55,6 +64,21 @@ cat >test-job.json <<_END_
       {
         "Name": "group1",
         "Count": 1,
+        "Networks": [
+          {
+            "DynamicPorts": [
+              {
+                "label": "http"
+              }
+            ]
+          }
+        ],
+        "Services": [
+            {
+                "Name": "static-http",
+                "PortLabel": "http"
+            }
+        ],
         "Tasks": [
           {
             "Name": "http-server",
@@ -63,7 +87,9 @@ cat >test-job.json <<_END_
             "Config": {
               "image": "pierrezemb/gostatic:latest",
               "args": [
-                "-enable-health"
+                "-enable-health",
+                "-port",
+                "\${NOMAD_PORT_http}"
               ],
               "network_mode": "container:tests_cluster_1",
               "volumes": [
@@ -72,17 +98,7 @@ cat >test-job.json <<_END_
             },
             "Resources": {
               "CPU": 500,
-              "MemoryMB": 256,
-              "Networks": [
-                {
-                  "Device": "",
-                  "CIDR": "",
-                  "IP": "",
-                  "MBits": 10,
-                  "DynamicPorts": [
-                  ]
-                }
-              ]
+              "MemoryMB": 512
             },
             "Leader": true
           },
@@ -97,23 +113,13 @@ cat >test-job.json <<_END_
               "network_mode": "container:tests_cluster_1"
             },
             "Env": {
-              "CONSUL_ADDR": "http://cluster:8500",
+              "CONSUL_ADDR": "http://\${attr.unique.network.ip-address}:8500",
               "CONSUL_KV2DIR_DIR_TEST": "k8s-configmaps/test-ns/test-cm",
               "CONSUL_KV2DIR_ROOT": "/alloc/cm"
             },
             "Resources": {
               "CPU": 500,
-              "MemoryMB": 256,
-              "Networks": [
-                {
-                  "Device": "",
-                  "CIDR": "",
-                  "IP": "",
-                  "MBits": 10,
-                  "DynamicPorts": [
-                  ]
-                }
-              ]
+              "MemoryMB": 512
             },
             "Leader": false
           }
@@ -148,14 +154,19 @@ cat >test-job.json <<_END_
 }
 _END_
 
+jq . test-job.json
 curl --silent --show-error --fail -XPOST http://cluster:4646/v1/jobs --data @test-job.json
-retry_curl 30 2 http://cluster:8043/health
-retry_curl 30 2 http://cluster:8043/file
-curl --silent --show-error --fail -o test-cm-file.in http://cluster:8043/file
-cmp test-cm-file test-cm-file.in
+
+ip addr
+retry_consul_service 30 2 static-http
+addr=$(jq -r '.[0] | "\(.ServiceAddress):\(.ServicePort)"' curl-out)
+retry_curl 30 2 http://"$addr"/health
+retry_curl 30 2 http://"$addr"/file
+cmp test-cm-file curl-out
 
 ln -s /opt/spark* /opt/spark
-find /root/.m2/repository -name '*.jar' -exec ln {} /opt/spark/jars \;
+find /root/.m2/repository -name 'hadoop-aws-*.jar' -exec ln {} /opt/spark/jars \;
+find /root/.m2/repository -name 'aws-java-sdk-*.jar' -exec ln {} /opt/spark/jars \;
 
 (
     cd /opt/spark
