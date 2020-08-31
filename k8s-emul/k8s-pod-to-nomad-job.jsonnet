@@ -1,3 +1,5 @@
+local MHZ_PER_CPU = 3000;
+
 local configmaps_consul_prefix = std.extVar("configmaps_consul_prefix");
 local k8s_namespace = std.extVar("k8s_namespace");
 local k8s_pod = std.parseJson(std.extVar("k8s_pod"));
@@ -54,8 +56,12 @@ local task_config_extra = {}
         ],
         "Services": [
             {
-              "Name": "k8s--%s--%s--%s" % [k8s_namespace, k8s_pod.metadata.labels["spark-role"], k8s_port.name],
-              #[k8s_namespace, k8s_pod.metadata.name, k8s_port.name],
+              "Name": "k8s--%s--%s--%s" % [
+                k8s_namespace,
+                # k8s_pod.metadata.name
+                k8s_pod.metadata.labels["spark-role"],
+                k8s_port.name,
+              ],
               "PortLabel": "%s--%s" % [k8s_container.name, k8s_port.name],
             }
             for k8s_container in k8s_pod.spec.containers
@@ -115,8 +121,12 @@ local task_config_extra = {}
               if std.objectHas(i, "valueFrom")
             ]),
             "Resources": {
-              "CPU": 1000,
-              "MemoryMB": 2048,
+              "CPU": MHZ_PER_CPU * std.parseInt(k8s_container.resources.requests.cpu),
+              "MemoryMB":
+                if std.endsWith(k8s_container.resources.requests.memory, "Mi") then
+                  std.parseInt(std.strReplace(k8s_container.resources.requests.memory, "Mi", ""))
+                else
+                  std.assertEqual(0, 1)
             },
             "Templates": [] +
             (
